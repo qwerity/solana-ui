@@ -1,0 +1,10 @@
+/.idea
+
+/target
+
+voters.txt
+
+# macOS build artifacts
+*.app
+*.dmg
+.DS_Store

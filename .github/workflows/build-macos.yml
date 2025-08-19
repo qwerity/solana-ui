@@ -1,0 +1,95 @@
+name: Build macOS App
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+
+jobs:
+  build-macos:
+    runs-on: macos-latest
+    
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+      
+    - name: Install Rust
+      uses: dtolnay/rust-toolchain@stable
+      with:
+        toolchain: stable
+        
+    - name: Cache cargo registry
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+        restore-keys: |
+          ${{ runner.os }}-cargo-
+          
+    - name: Install create-dmg
+      run: brew install create-dmg
+      
+    - name: Build release binary
+      run: cargo build --release
+      
+    - name: Create app bundle structure
+      run: |
+        mkdir -p "solana-ui.app/Contents/MacOS"
+        mkdir -p "solana-ui.app/Contents/Resources"
+        
+    - name: Copy binary to app bundle
+      run: |
+        cp target/release/solana-ui "solana-ui.app/Contents/MacOS/solana-ui"
+        chmod +x "solana-ui.app/Contents/MacOS/solana-ui"
+        
+    - name: Copy Info.plist
+      run: |
+        cp Info.plist "solana-ui.app/Contents/Info.plist"
+        
+    - name: Generate icons
+      run: |
+        # Install librsvg for SVG conversion
+        brew install librsvg
+        
+        # Generate icons using our script
+        ./scripts/generate-icons.sh
+        
+        # Copy to app bundle
+        cp assets/icons/AppIcon.icns "solana-ui.app/Contents/Resources/"
+        
+    - name: Create DMG
+      run: |
+        create-dmg \
+          --volname "Solana UI" \
+          --volicon "assets/icons/AppIcon.icns" \
+          --window-pos 200 120 \
+          --window-size 800 400 \
+          --icon-size 100 \
+          --icon "solana-ui.app" 200 190 \
+          --hide-extension "solana-ui.app" \
+          --app-drop-link 600 185 \
+          --disk-image-size 200 \
+          "solana-ui.dmg" \
+          "solana-ui.app"
+          
+    - name: Upload DMG artifact
+      uses: actions/upload-artifact@v4
+      with:
+        name: solana-ui-macos
+        path: solana-ui.dmg
+        
+    - name: Create Release
+      if: startsWith(github.ref, 'refs/tags/')
+      uses: softprops/action-gh-release@v1
+      with:
+        files: |
+          solana-ui.dmg
+        draft: false
+        prerelease: false
+        generate_release_notes: true
+      env:
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

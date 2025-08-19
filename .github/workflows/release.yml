@@ -1,0 +1,204 @@
+name: Build and Release DMG
+
+on:
+  push:
+    branches: [ master ]
+    # Trigger on any push to master, but only build if version changed
+    # paths:
+    #   - 'Cargo.toml'
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  # Check if version changed
+  check-version:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      changed: ${{ steps.check.outputs.changed }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 2
+          
+      - name: Get current version
+        id: version
+        run: |
+          VERSION=$(grep '^version = ' Cargo.toml | head -n 1 | sed 's/version = "\(.*\)"/\1/')
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Current version: $VERSION"
+          
+      - name: Check if should build release
+        id: check
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          
+          # Check if this version tag already exists
+          if git tag --list | grep -q "^v${VERSION}$"; then
+            echo "changed=false" >> $GITHUB_OUTPUT
+            echo "Version v${VERSION} already released"
+          else
+            echo "changed=true" >> $GITHUB_OUTPUT
+            echo "New version v${VERSION} - will create release"
+          fi
+
+  # Build macOS DMG
+  build-macos:
+    runs-on: macos-latest
+    needs: check-version
+    if: needs.check-version.outputs.changed == 'true'
+    steps:
+      - uses: actions/checkout@v4
+      
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: x86_64-apple-darwin,aarch64-apple-darwin
+          
+      - name: Install macOS dependencies
+        run: |
+          brew install create-dmg librsvg
+          
+      - name: Cache Cargo dependencies
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.cargo/registry
+            ~/.cargo/git
+            target
+          key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-cargo-
+            
+      - name: Sync version to Info.plist
+        run: |
+          VERSION="${{ needs.check-version.outputs.version }}"
+          sed -i '' "s/<string>[0-9]\+\.[0-9]\+\.[0-9]\+<\/string>/<string>$VERSION<\/string>/g" Info.plist
+          echo "Synced version $VERSION to Info.plist"
+          
+      - name: Build for Intel (x86_64)
+        run: |
+          rustup target add x86_64-apple-darwin
+          cargo build --release --target x86_64-apple-darwin
+          
+      - name: Build for Apple Silicon (aarch64)
+        run: |
+          rustup target add aarch64-apple-darwin
+          cargo build --release --target aarch64-apple-darwin
+          
+      - name: Create Universal Binary
+        run: |
+          lipo -create -output target/release/solana-ui-universal \
+            target/x86_64-apple-darwin/release/solana-ui \
+            target/aarch64-apple-darwin/release/solana-ui
+          chmod +x target/release/solana-ui-universal
+          
+      - name: Build macOS App Bundle
+        run: |
+          VERSION="${{ needs.check-version.outputs.version }}"
+          
+          # Create app bundle structure
+          rm -rf "solana-ui.app"
+          mkdir -p "solana-ui.app/Contents/MacOS"
+          mkdir -p "solana-ui.app/Contents/Resources"
+          
+          # Copy universal binary
+          cp target/release/solana-ui-universal "solana-ui.app/Contents/MacOS/solana-ui"
+          chmod +x "solana-ui.app/Contents/MacOS/solana-ui"
+          
+          # Copy Info.plist
+          cp Info.plist "solana-ui.app/Contents/Info.plist"
+          
+          # Generate and copy icons if possible
+          if [ -f "scripts/generate-icons.sh" ]; then
+            chmod +x ./scripts/generate-icons.sh
+            ./scripts/generate-icons.sh || echo "Icon generation failed, continuing without icons"
+          fi
+          
+          if [ -f "assets/icons/AppIcon.icns" ]; then
+            cp assets/icons/AppIcon.icns "solana-ui.app/Contents/Resources/"
+          fi
+          
+      # Note: Building unsigned app - no code signing required
+          
+      - name: Create DMG
+        run: |
+          VERSION="${{ needs.check-version.outputs.version }}"
+          create-dmg \
+            --volname "Solana UI v$VERSION" \
+            --window-pos 200 120 \
+            --window-size 800 400 \
+            --icon-size 100 \
+            --icon "solana-ui.app" 200 190 \
+            --hide-extension "solana-ui.app" \
+            --app-drop-link 600 185 \
+            --disk-image-size 200 \
+            "solana-ui-v${VERSION}.dmg" \
+            "solana-ui.app" || echo "DMG creation completed with warnings"
+            
+      # Note: No notarization - building unsigned DMG
+          
+      - name: Upload DMG artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: solana-ui-dmg
+          path: solana-ui-v*.dmg
+          
+  # Create GitHub Release
+  release:
+    runs-on: ubuntu-latest
+    needs: [check-version, build-macos]
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          
+      - name: Download DMG artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: solana-ui-dmg
+        
+      - name: Generate release notes
+        id: release-notes
+        run: |
+          VERSION="${{ needs.check-version.outputs.version }}"
+          
+          # Create release notes
+          cat > release-notes.md << EOF
+          # Solana UI v${VERSION}
+          
+          ## What's New
+          
+          $(git log --oneline --pretty=format:"- %s" $(git describe --tags --abbrev=0 2>/dev/null || echo HEAD~10)..HEAD | head -20 || echo "- Initial release")
+          
+          ## Installation
+          
+          1. Download the DMG file below
+          2. Open the DMG and drag Solana UI to Applications
+          3. Run from Applications or use Spotlight to search "Solana UI"
+          
+          ## System Requirements
+          
+          - macOS 10.15 or later
+          - Universal binary (Intel + Apple Silicon)
+          
+          ## Auto-Updates
+          
+          The app includes an auto-updater. Use **Cmd+Shift+U** to check for updates or visit the 🔄 Update tab.
+          EOF
+          
+      - name: Create Release
+        uses: softprops/action-gh-release@v1
+        with:
+          tag_name: v${{ needs.check-version.outputs.version }}
+          name: Solana UI v${{ needs.check-version.outputs.version }}
+          body_path: release-notes.md
+          draft: false
+          prerelease: false
+          files: solana-ui-v*.dmg
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

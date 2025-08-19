@@ -1,0 +1,30 @@
+[package]
+name = "solana-ui"
+version = "0.1.0"
+edition = "2024"
+
+[lints.rust]
+warnings = "deny"
+unused_mut = "allow"  # False positive for FnMut closure parameters
+
+[[bin]]
+name = "solana-ui"
+path = "src/main.rs"
+
+[dependencies]
+eframe = "0.32.1"
+egui = "0.32.1"
+egui_extras = { version = "0.32.1", features = ["datepicker", "image"] }
+tokio = { version = "1.0", features = ["full"] }
+serde = { version = "1.0", features = ["derive"] }
+anyhow = "1.0"
+reqwest = { version = "0.12", features = ["json"] }
+solana-client = "3"
+solana-sdk = "3"
+solana-rpc-client-api = "3"
+solana-commitment-config = "3"
+solana-transaction-status = "3"
+chrono = { version = "0.4", features = ["serde"] }
+dirs = "6.0"
+serde_json = "1.0"
+resvg = "0.45.1"
