@@ -12,14 +12,14 @@ pub const HEADER_SPACING_TINY: f32 = 8.0;
 pub const CONTENT_SPACING_SMALL: f32 = 4.0;
 
 // Search Field Constants
-pub const SEARCH_FIELD_WIDTH: f32 = 200.0;
+pub const SEARCH_FIELD_WIDTH: f32 = 350.0;
 pub const SEARCH_FIELD_HEIGHT: f32 = 20.0;
-pub const SMALL_SEARCH_FIELD_WIDTH: f32 = 160.0;
+pub const SMALL_SEARCH_FIELD_WIDTH: f32 = 300.0;
 pub const EPOCH_FIELD_WIDTH: f32 = 60.0;
 pub const BUTTON_FIELD_WIDTH: f32 = 150.0;
 
 // Table Column Widths
-pub const COLUMN_PUBKEY_WIDTH: f32 = 320.0;
+pub const COLUMN_PUBKEY_WIDTH: f32 = 350.0;
 pub const COLUMN_ADDRESS_WIDTH: f32 = 150.0;
 pub const COLUMN_VERSION_WIDTH: f32 = 100.0;
 pub const COLUMN_FEATURE_WIDTH: f32 = 80.0;
