@@ -27,7 +27,7 @@ fn load_solana_icon() -> Option<egui::IconData> {
     // Parse SVG and render to PNG at 32x32
     match resvg::usvg::Tree::from_data(svg_data, &resvg::usvg::Options::default()) {
         Ok(tree) => {
-            let size = 32;
+            let size = 512;
             let mut pixmap = resvg::tiny_skia::Pixmap::new(size, size)?;
 
             // Calculate scale to fit the logo in 32x32
