@@ -27,7 +27,7 @@ pub struct AppConfig {
     pub last_slot_search: String,
     /// Last entered voter account search filter
     pub last_voter_account_search: String,
-    /// Last entered gossip identity search filter  
+    /// Last entered gossip identity search filter
     pub last_gossip_identity_search: String,
     /// Last selected tab
     pub last_selected_tab: String,
@@ -117,6 +117,22 @@ impl ConfigManager {
     pub fn update_leader_schedule(&mut self, identity: &str, epoch: &str) {
         self.config.last_leader_identity = identity.to_string();
         self.config.last_leader_epoch = epoch.to_string();
+    }
+
+    /// Update window size and position
+    pub fn update_window_geometry(&mut self, size: Option<(f32, f32)>, position: Option<(f32, f32)>) {
+        self.config.window_size = size;
+        self.config.window_position = position;
+    }
+
+    /// Get window size from config
+    pub fn get_window_size(&self) -> Option<(f32, f32)> {
+        self.config.window_size
+    }
+
+    /// Get window position from config
+    pub fn get_window_position(&self) -> Option<(f32, f32)> {
+        self.config.window_position
     }
 
     /// Update search filters.

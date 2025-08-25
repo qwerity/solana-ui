@@ -60,14 +60,30 @@ fn load_solana_icon() -> Option<egui::IconData> {
 }
 
 fn main() -> Result<(), eframe::Error> {
+    // Load the configuration to get window settings
+    let config_manager = config::ConfigManager::new();
+
     // Load the official Solana icon
     let icon = load_solana_icon();
 
-    // Configure native window options
+    // Get window settings from config or use defaults
+    let window_size = config_manager
+        .get_window_size()
+        .unwrap_or(app_config::WINDOW_SIZE.into());
+    let window_position = config_manager.get_window_position();
+
+    // Configure native window options with saved geometry
+    let mut viewport_builder = egui::ViewportBuilder::default()
+        .with_inner_size([window_size.0, window_size.1])
+        .with_title(app_config::WINDOW_TITLE);
+
+    // Set position if available
+    if let Some(pos) = window_position {
+        viewport_builder = viewport_builder.with_position([pos.0, pos.1]);
+    }
+
     let options = eframe::NativeOptions {
-        viewport: egui::ViewportBuilder::default()
-            .with_inner_size(app_config::WINDOW_SIZE)
-            .with_title(app_config::WINDOW_TITLE),
+        viewport: viewport_builder,
         ..Default::default()
     };
 

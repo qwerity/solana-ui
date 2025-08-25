@@ -488,7 +488,7 @@ impl ValidatorApp {
     fn trigger_update_check(&mut self) {
         // Switch to update tab and log the action
         self.current_tab = AppTab::Update;
-        
+
         // Log the update check trigger
         crate::tabs::logs::log_update(
             &self.log_store,
@@ -496,7 +496,7 @@ impl ValidatorApp {
             "Update check triggered via keyboard shortcut (Cmd+Shift+U)",
             "Triggered"
         );
-        
+
         // Save config due to tab change
         self.config_manager.update_selected_tab(self.current_tab.id());
         self.config_manager.auto_save();
@@ -577,6 +577,22 @@ impl eframe::App for ValidatorApp {
 
         // Update refresh status based on elapsed time
         self.status_manager.update();
+
+        // Save window geometry if changed
+        if let Some(viewport) = ctx.input(|i| i.viewport().inner_rect) {
+            let current_size = (viewport.width(), viewport.height());
+            let current_position = ctx.input(|i| i.viewport().outer_rect.map(|r| (r.min.x, r.min.y)));
+
+            // Update config if window geometry changed
+            let config_size = self.config_manager.get_window_size().unwrap_or((0.0, 0.0));
+            let config_position = self.config_manager.get_window_position();
+
+            if (current_size.0 - config_size.0).abs() > 1.0
+                || (current_size.1 - config_size.1).abs() > 1.0
+                || current_position != config_position {
+                self.config_manager.update_window_geometry(Some(current_size), current_position);
+            }
+        }
 
         // Top panel for cluster selection and tab selection
         egui::TopBottomPanel::top("top_panel")
@@ -865,6 +881,7 @@ impl eframe::App for ValidatorApp {
     }
 
     fn on_exit(&mut self, _gl: Option<&eframe::glow::Context>) {
-        // Perform cleanup when app exits
+        // Save final configuration when app exits
+        self.save_current_state();
     }
 }
