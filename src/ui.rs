@@ -130,7 +130,7 @@ impl Default for ValidatorApp {
             vote_account_search: config.last_vote_account_search.clone(),
             slot_search: config.last_slot_search.clone(),
             voter_account_search: config.last_voter_account_search.clone(),
-            leader_identity_search: config.last_leader_identity.clone(),
+            leader_identity_search: config.leader_identity_history.first().cloned().unwrap_or_default(),
             leader_epoch_search: config.last_leader_epoch.clone(),
             gossip_identity_search: config.last_gossip_identity_search.clone(),
             validators_search: String::new(),
@@ -810,6 +810,7 @@ impl eframe::App for ValidatorApp {
                             ui,
                             LeaderScheduleTabParams {
                                 leader_identity_search: &mut self.leader_identity_search,
+                                leader_identity_history: &self.config_manager.config.leader_identity_history,
                                 leader_epoch_search: &mut self.leader_epoch_search,
                                 leader_result: &leader_result,
                                 error_message: &self.error_message,

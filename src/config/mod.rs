@@ -13,8 +13,8 @@ use std::path::PathBuf;
 /// Application configuration that persists between sessions.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AppConfig {
-    /// Last entered validator identity for leader schedule
-    pub last_leader_identity: String,
+    /// Previously used leader identities
+    pub leader_identity_history: Vec<String>,
     /// Last entered epoch for leader schedule
     pub last_leader_epoch: String,
     /// Last selected cluster
@@ -40,7 +40,7 @@ pub struct AppConfig {
 impl Default for AppConfig {
     fn default() -> Self {
         Self {
-            last_leader_identity: String::new(),
+            leader_identity_history: Vec::new(),
             last_leader_epoch: String::new(),
             selected_cluster: Cluster::Mainnet,
             last_identity_search: String::new(),
@@ -58,7 +58,7 @@ impl Default for AppConfig {
 /// Configuration manager for the Solana UI application.
 pub struct ConfigManager {
     config_path: PathBuf,
-    config: AppConfig,
+    pub config: AppConfig,
 }
 
 impl Default for ConfigManager {
@@ -115,8 +115,16 @@ impl ConfigManager {
 
     /// Update leader schedule settings.
     pub fn update_leader_schedule(&mut self, identity: &str, epoch: &str) {
-        self.config.last_leader_identity = identity.to_string();
         self.config.last_leader_epoch = epoch.to_string();
+        if !identity.is_empty() {
+            self.config
+                .leader_identity_history
+                .retain(|x| x != identity);
+            self.config
+                .leader_identity_history
+                .insert(0, identity.to_string());
+            self.config.leader_identity_history.truncate(10);
+        }
     }
 
     /// Update window size and position

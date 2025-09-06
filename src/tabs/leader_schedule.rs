@@ -12,6 +12,7 @@ use crate::utils::create_error_frame;
 #[allow(dead_code)]
 pub struct LeaderScheduleTabParams<'a> {
     pub leader_identity_search: &'a mut String,
+    pub leader_identity_history: &'a Vec<String>,
     pub leader_epoch_search: &'a mut String,
     pub leader_result: &'a Option<LeaderScheduleInfo>,
     pub error_message: &'a Option<String>,
@@ -28,6 +29,7 @@ pub fn render_leader_schedule_tab(
 ) {
     let LeaderScheduleTabParams {
         leader_identity_search,
+        leader_identity_history,
         leader_epoch_search,
         leader_result,
         error_message,
@@ -41,13 +43,32 @@ pub fn render_leader_schedule_tab(
         // Compact search controls right next to the heading
         ui.label("🔑 Identity:");
         ui.add_space(CONTENT_SPACING_SMALL);
-        let identity_response = ui
-            .add_sized(
-                [SEARCH_FIELD_WIDTH, SEARCH_FIELD_HEIGHT],
-                egui::TextEdit::singleline(leader_identity_search)
-                    .hint_text("Enter validator identity..."),
-            )
-            .on_hover_text("Enter validator identity public key (base58)");
+
+        let mut identity_changed = false;
+
+        // Custom editable combo box using a TextEdit and a menu button
+        let text_edit_response = ui.add_sized(
+            [SEARCH_FIELD_WIDTH - 28.0, SEARCH_FIELD_HEIGHT],
+            egui::TextEdit::singleline(leader_identity_search)
+                .hint_text("Enter validator identity..."),
+        );
+        if text_edit_response.changed() {
+            identity_changed = true;
+        }
+
+        ui.menu_button("▼", |ui| {
+            if leader_identity_history.is_empty() {
+                ui.label("No recent identities");
+            } else {
+                for identity in leader_identity_history {
+                    if ui.button(identity).clicked() {
+                        *leader_identity_search = identity.clone();
+                        identity_changed = true;
+                        ui.close();
+                    }
+                }
+            }
+        });
 
         ui.add_space(HEADER_SPACING_TINY);
         ui.label("📅 Epoch:");
@@ -81,7 +102,7 @@ pub fn render_leader_schedule_tab(
         }
 
         // Save if leader schedule fields changed
-        if identity_response.changed() || epoch_response.changed() {
+        if identity_changed || epoch_response.changed() {
             on_search_change();
         }
     });
